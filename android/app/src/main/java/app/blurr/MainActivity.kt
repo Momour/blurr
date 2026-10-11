@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
         val detections: Int,
         val avgMs: Double,
         val usedFallback: Boolean,
+        val plan: MaskPlan.Stats,
     )
 
     private val ui = Handler(Looper.getMainLooper())
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
     private var selectedUri: Uri? = null
     private var selectedInfo: VideoInfo? = null
     private var plan: MaskPlan? = null
+    private var runOptions: Options? = null
     private var summary: Summary? = null
     private var saved: MediaStoreSaver.Saved? = null
     private var verification: Verifier.Result? = null
@@ -77,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var optionsBox: LinearLayout
     private lateinit var qualityGroup: RadioGroup
     private lateinit var sensitivityGroup: RadioGroup
+    private lateinit var styleGroup: RadioGroup
     private lateinit var startButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
@@ -174,6 +177,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val options = currentOptions()
+        runOptions = options
         cancelRequested.set(false)
         hdrAttempt = 0
         usedForcedSdr = false
@@ -186,7 +190,12 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setStatus("Préparation de la détection...")
         refreshUi()
-        AppLog.i("--- Traitement : analyse ${options.analysisMaxSide} px, seuil ${options.scoreThreshold}, masque x${options.maskScale}, marge ${options.marginFrames} images ---")
+        val t = options.tracking
+        AppLog.i(
+            "--- Traitement : analyse ${options.analysisMaxSide} px, sensibilité ${options.sensitivity} (seuil ${t.keepThreshold}, " +
+                "confirmation ${t.confirmThreshold}, ${t.minHits} détection(s) min.), rendu ${options.style}, " +
+                "masque x${options.maskScale}, marge ${options.marginFrames} images ---",
+        )
 
         worker.execute {
             var detector: YuNetDetector? = null
@@ -194,7 +203,7 @@ class MainActivity : ComponentActivity() {
                 if (!OpenCVLoader.initLocal()) {
                     throw IllegalStateException("OpenCV n'a pas pu être chargé (bibliothèque native absente pour ce processeur)")
                 }
-                detector = YuNetDetector(this, options.scoreThreshold)
+                detector = YuNetDetector(this, options.tracking.keepThreshold)
                 val result = Analyzer.run(
                     context = this,
                     uri = uri,
@@ -214,13 +223,20 @@ class MainActivity : ComponentActivity() {
                     },
                     isCancelled = { cancelRequested.get() },
                 )
-                val built = MaskPlan.build(result.detections, options.maskScale, options.marginFrames)
+                val built = MaskPlan.build(
+                    detections = result.detections,
+                    params = options.tracking,
+                    maskScale = options.maskScale,
+                    marginFrames = options.marginFrames,
+                    aspect = info.displayWidth.toFloat() / info.displayHeight,
+                )
                 val s = Summary(
                     frames = result.frames,
                     framesWithFaces = result.detections.framesWithFaces,
                     detections = result.detections.totalFaces,
                     avgMs = result.avgDetectMs,
                     usedFallback = result.usedFallback,
+                    plan = built.stats,
                 )
                 ui.post { onAnalysisDone(s, built) }
             } catch (c: Analyzer.Cancelled) {
@@ -245,7 +261,10 @@ class MainActivity : ComponentActivity() {
         }
         summary = s
         plan = built
-        AppLog.i("Plan de masquage : ${built.frameCount} images, ${s.framesWithFaces} avec détection, ${s.detections} détections")
+        AppLog.i(
+            "Plan de masquage : ${built.frameCount} images, ${s.framesWithFaces} avec détection, ${s.detections} détections, " +
+                "${s.plan.tracks} pistes dont ${s.plan.confirmedTracks} masquées, ${s.plan.maskedFrames} images masquées",
+        )
         startExport()
     }
 
@@ -253,6 +272,7 @@ class MainActivity : ComponentActivity() {
         val uri = selectedUri ?: return
         val info = selectedInfo ?: return
         val p = plan ?: return
+        val options = runOptions ?: return
 
         val hdrMode = when {
             !info.isHdr -> Composition.HDR_MODE_KEEP_HDR
@@ -265,7 +285,7 @@ class MainActivity : ComponentActivity() {
         refreshUi()
         AppLog.i("Export : mode HDR $hdrMode (tentative ${hdrAttempt + 1})")
         try {
-            exporter.start(uri, info, p, hdrMode, exportCallback)
+            exporter.start(uri, info, p, options.style, hdrMode, exportCallback)
         } catch (t: Throwable) {
             AppLog.e("Démarrage de l'export impossible", t)
             fail("Export impossible : ${t.message ?: t.javaClass.simpleName}")
@@ -287,6 +307,8 @@ class MainActivity : ComponentActivity() {
             setStatus("Étape 3/3 : contrôle du résultat...")
             refreshUi()
             val sourceName = selectedInfo?.name ?: "video"
+            val checkPlan = plan
+            val checkOptions = runOptions
             worker.execute {
                 try {
                     // Contrôle : relecture de la vidéo produite. Une panne ici ne doit jamais empêcher l'enregistrement.
@@ -295,6 +317,8 @@ class MainActivity : ComponentActivity() {
                         check = Verifier.run(
                             context = this@MainActivity,
                             file = output,
+                            plan = checkNotNull(checkPlan),
+                            options = checkNotNull(checkOptions),
                             onProgress = { fraction ->
                                 ui.post {
                                     if (phase == Phase.VERIFYING) showProgress("Étape 3/3 : contrôle du résultat", fraction, null)
@@ -349,12 +373,16 @@ class MainActivity : ComponentActivity() {
         text.append("Fichier : ${MediaStoreSaver.RELATIVE_PATH}/${s.displayName} (${Formatter.formatShortFileSize(this, s.sizeBytes)}).\n")
         if (a != null) {
             val pct = if (a.frames > 0) 100.0 * a.framesWithFaces / a.frames else 0.0
+            val masked = if (a.frames > 0) 100.0 * a.plan.maskedFrames / a.frames else 0.0
             text.append(
-                "Visages détectés sur ${a.framesWithFaces} images sur ${a.frames} " +
-                    "(${String.format(Locale.getDefault(), "%.0f", pct)} %).\n",
+                "Détections brutes sur ${a.framesWithFaces} images sur ${a.frames} " +
+                    "(${String.format(Locale.getDefault(), "%.0f", pct)} %). " +
+                    "${a.plan.confirmedTracks} piste(s) de visage masquée(s), ${a.plan.rejectedTracks} piste(s) non " +
+                    "confirmée(s) écartée(s) (faux positifs probables). Images masquées : " +
+                    "${String.format(Locale.getDefault(), "%.0f", masked)} %.\n",
             )
-            if (a.detections == 0) {
-                text.append("ATTENTION : aucun visage détecté, la vidéo n'a reçu aucun masque. Essayez la sensibilité maximale.\n")
+            if (a.plan.confirmedTracks == 0) {
+                text.append("ATTENTION : aucun visage confirmé, la vidéo n'a reçu aucun masque. Essayez la sensibilité maximale.\n")
             }
             if (a.usedFallback) text.append("Analyse en mode de repli (plus lent, moins précis).\n")
             val tolerance = maxOf(2, a.frames / 50)
@@ -369,11 +397,11 @@ class MainActivity : ComponentActivity() {
         if (c == null) {
             text.append("Contrôle automatique du résultat : non effectué.\n")
         } else if (c.framesWithFaces == 0) {
-            text.append("Contrôle automatique : ${c.sampledFrames} images de la vidéo produite relues, aucun visage détectable.\n")
+            text.append("Contrôle automatique : ${c.sampledFrames} images de la vidéo produite relues, aucun visage détectable hors des zones masquées.\n")
         } else {
             text.append(
-                "ATTENTION, contrôle automatique : un visage reste détectable sur ${c.framesWithFaces} des " +
-                    "${c.sampledFrames} images relues. Regardez attentivement ces passages.\n",
+                "ATTENTION, contrôle automatique : un visage reste détectable hors des zones masquées sur " +
+                    "${c.framesWithFaces} des ${c.sampledFrames} images relues. Regardez attentivement ces passages.\n",
             )
         }
         if (usedForcedSdr) text.append("HDR converti en SDR par la méthode de secours : les couleurs peuvent paraître ternes.\n")
@@ -425,10 +453,12 @@ class MainActivity : ComponentActivity() {
 
     private fun currentOptions(): Options {
         val sizes = intArrayOf(960, 1280, 1920)
-        val thresholds = floatArrayOf(0.6f, 0.4f, 0.25f)
+        val sensitivities = Sensitivity.entries
+        val styles = MaskStyle.entries
         return Options(
             analysisMaxSide = sizes[selectedIndex(qualityGroup).coerceIn(0, sizes.lastIndex)],
-            scoreThreshold = thresholds[selectedIndex(sensitivityGroup).coerceIn(0, thresholds.lastIndex)],
+            sensitivity = sensitivities[selectedIndex(sensitivityGroup).coerceIn(0, sensitivities.lastIndex)],
+            style = styles[selectedIndex(styleGroup).coerceIn(0, styles.lastIndex)],
         )
     }
 
@@ -490,6 +520,7 @@ class MainActivity : ComponentActivity() {
         optionsBox.visibility = if (info != null) View.VISIBLE else View.GONE
         setChildrenEnabled(qualityGroup, !busy)
         setChildrenEnabled(sensitivityGroup, !busy)
+        setChildrenEnabled(styleGroup, !busy)
         startButton.isEnabled = !busy && info != null
         progressBar.visibility = if (busy) View.VISIBLE else View.GONE
         cancelButton.visibility = if (phase == Phase.ANALYZING || phase == Phase.EXPORTING || phase == Phase.VERIFYING) View.VISIBLE else View.GONE
@@ -581,8 +612,14 @@ class MainActivity : ComponentActivity() {
         )
         sensitivityGroup = optionsBox.addChoice(
             "Sensibilité (plus sensible = moins de visages manqués, plus de faux masques)",
-            listOf("Normale", "Élevée", "Maximale"),
+            listOf("Normale (moins de faux masques)", "Élevée", "Maximale (moins de visages manqués)"),
             defaultIndex = 1,
+        )
+        // Même ordre que MaskStyle : BLUR, BLACK.
+        styleGroup = optionsBox.addChoice(
+            "Rendu",
+            listOf("Flou", "Masque noir (protection la plus sûre)"),
+            defaultIndex = 0,
         )
         root.add(optionsBox, top = 12)
 

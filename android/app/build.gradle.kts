@@ -20,8 +20,8 @@ android {
         minSdk = 29
         // 34 : évite le mode bord à bord imposé à partir de 35 (interface construite sans gestion des encoches).
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         // OpenCV pèse lourd : seules les puces 64 bits ARM sont embarquées (tous les téléphones récents).
         ndk {

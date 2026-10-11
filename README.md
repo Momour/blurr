@@ -15,7 +15,7 @@ Application et outillage de masquage automatique des visages dans les vidéos (d
 blurr/
   desktop/            # Environnement Python desktop (CLI blurr-ref, ingestion, métriques, baselines)
   dataset/            # Métadonnées, matrice de conditions, guide d'annotation (aucun média)
-  android/            # Application Android MVP v0.1 (YuNet via OpenCV, export Media3), APK dans android/apk/
+  android/            # Application Android v0.2 (YuNet via OpenCV, suivi temporel, flou ou masque noir via Media3), APK dans android/apk/
 ```
 
 ## Licence
