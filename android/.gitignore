@@ -5,5 +5,7 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
+# APK : ignorés partout sauf dans apk/ (version publiée dans le dépôt)
 *.apk
+!apk/*.apk
 *.aab
