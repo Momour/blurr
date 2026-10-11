@@ -1,0 +1,78 @@
+# ==========================================
+# blurr - .gitignore
+# AUCUN FICHIER MÉDIA DANS LE DÉPÔT (règle stricte)
+# Les fixtures de test sont générées en code (numpy).
+# ==========================================
+
+# Formats vidéo
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.flv
+*.wmv
+*.m4v
+*.3gp
+
+# Formats image
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tiff
+*.tif
+*.webp
+*.gif
+*.heic
+*.heif
+*.raw
+*.dng
+*.cr2
+*.nef
+
+# Formats audio
+*.mp3
+*.wav
+*.aac
+*.m4a
+*.flac
+*.ogg
+
+# Répertoires de données hors dépôt (volume chiffré blurr-data/)
+blurr-data/
+data/
+raw/
+frames/
+runs/
+debug/
+docker/
+
+# Registre des consentements et données personnelles sensibles
+*consentement*.csv
+*consentements*.csv
+consentements/
+*.key
+*.pem
+*.env
+*.env.*
+
+# Environnements et caches Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# IDE et OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
