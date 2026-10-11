@@ -2,8 +2,6 @@
 
 Floute les visages d'une vidéo, hors ligne. Détection YuNet (OpenCV), export Media3, aucune permission Internet.
 
-Mode d'emploi, état de vérification, limites et décisions : voir [../docs/mvp-android.md](../docs/mvp-android.md).
-
 Compilation rapide (JDK 17 ou plus, SDK Android 36, `local.properties` avec `sdk.dir=...`) :
 
 ```

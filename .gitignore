@@ -76,3 +76,9 @@ build/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Documentation de travail (plans, protocoles) : conservée en local, non publiée sur GitHub
+/docs/
+
+# Copies de fichiers déposées par l'application Claude (dont l'APK) : ne pas versionner
+Claude outputs/
