@@ -49,14 +49,56 @@ class Detections {
     val framesWithFaces: Int get() = perFrame.count { it.isNotEmpty() }
 }
 
+/** Rendu appliqué aux zones à masquer. */
+enum class MaskStyle {
+    /** Flou fort, proportionnel à la taille du visage (défaut). */
+    BLUR,
+
+    /** Ellipse noire opaque : protection la plus sûre (aucune information du visage ne subsiste). */
+    BLACK,
+}
+
+/**
+ * Filtrage temporel des détections (voir [MaskPlan]) :
+ *  - le détecteur garde toute détection de score >= [keepThreshold] ;
+ *  - les détections sont reliées d'une image à l'autre en pistes ;
+ *  - une piste n'est masquée que si l'une de ses détections atteint [confirmThreshold] et si elle compte au moins
+ *    [minHits] détections. Une détection isolée de score moyen (faux positif typique) n'est donc jamais masquée,
+ *    tandis qu'un visage confirmé reste masqué sur les images où son score retombe (profil, flou de bougé).
+ */
+data class TrackingParams(
+    val keepThreshold: Float,
+    val confirmThreshold: Float,
+    val minHits: Int,
+    /** Trou maximal (sans détection) comblé par interpolation à l'intérieur d'une piste. */
+    val maxGapUs: Long = 300_000L,
+)
+
+/**
+ * Préréglages de sensibilité. Valeurs choisies sur une seule vidéo de test (retransmission de football,
+ * 1080p 60 i/s) : elles ne sont pas mesurées sur le jeu de test de l'étape 1.
+ */
+enum class Sensitivity(val params: TrackingParams) {
+    /** Moins de faux masques ; les très petits visages (moins de ~20 px) peuvent rester visibles. */
+    NORMAL(TrackingParams(keepThreshold = 0.5f, confirmThreshold = 0.85f, minHits = 2)),
+
+    /** Compromis par défaut. */
+    HIGH(TrackingParams(keepThreshold = 0.4f, confirmThreshold = 0.7f, minHits = 2)),
+
+    /** Moins de visages manqués, davantage de faux masques (proche du comportement de la v0.1). */
+    MAX(TrackingParams(keepThreshold = 0.3f, confirmThreshold = 0.5f, minHits = 1)),
+}
+
 /** Réglages de traitement. */
 data class Options(
     /** Plus grand côté de l'image envoyée au détecteur, en pixels. */
     val analysisMaxSide: Int = 1280,
-    /** Seuil de score YuNet : plus bas = moins de visages manqués, plus de faux masques. */
-    val scoreThreshold: Float = 0.4f,
+    val sensitivity: Sensitivity = Sensitivity.HIGH,
+    val style: MaskStyle = MaskStyle.BLUR,
     /** Agrandissement de la boîte détectée (l'ellipse inscrite dans une boîte 1,6x couvre 100 % de la boîte d'origine). */
     val maskScale: Float = 1.6f,
-    /** Chaque masque est prolongé de ce nombre d'images avant et après chaque détection. */
+    /** Chaque piste est prolongée de ce nombre d'images avant sa première et après sa dernière détection. */
     val marginFrames: Int = 5,
-)
+) {
+    val tracking: TrackingParams get() = sensitivity.params
+}

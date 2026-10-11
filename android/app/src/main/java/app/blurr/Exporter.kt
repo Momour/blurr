@@ -23,8 +23,9 @@ import androidx.media3.transformer.VideoEncoderSettings
 import java.io.File
 
 /**
- * Passe 2 : ré-encode la vidéo avec [MaskEffect] (Media3 Transformer). Le son est conservé, les métadonnées de la
- * source (GPS compris) ne sont pas recopiées. Toutes les méthodes doivent être appelées depuis le thread principal.
+ * Passe 2 : ré-encode la vidéo avec [MaskEffect] (flou ou masque noir, Media3 Transformer). Le son est conservé,
+ * les métadonnées de la source (GPS compris) ne sont pas recopiées. Toutes les méthodes doivent être appelées depuis
+ * le thread principal.
  */
 @UnstableApi
 class Exporter(context: Context) {
@@ -45,7 +46,7 @@ class Exporter(context: Context) {
 
     val isRunning: Boolean get() = transformer != null
 
-    fun start(uri: Uri, info: VideoInfo, plan: MaskPlan, hdrMode: Int, callback: Callback) {
+    fun start(uri: Uri, info: VideoInfo, plan: MaskPlan, style: MaskStyle, hdrMode: Int, callback: Callback) {
         check(Looper.myLooper() === Looper.getMainLooper()) { "L'export doit être démarré depuis le thread principal" }
         check(transformer == null) { "Un export est déjà en cours" }
 
@@ -54,7 +55,7 @@ class Exporter(context: Context) {
         val output = File(dir, "blurr-${System.currentTimeMillis()}.mp4")
         outputFile = output
 
-        val effects = Effects(emptyList<AudioProcessor>(), listOf<Effect>(MaskEffect(plan)))
+        val effects = Effects(emptyList<AudioProcessor>(), listOf<Effect>(MaskEffect(plan, style)))
         val item = EditedMediaItem.Builder(MediaItem.fromUri(uri)).setEffects(effects).build()
 
         // Une séquence "audio + vidéo" fabrique une piste audio muette si la source n'a pas de son : on ne la déclare
