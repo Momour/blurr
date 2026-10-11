@@ -1,0 +1,9 @@
+# Android / Gradle (le .gitignore racine exclut déjà build/, dist/, *.so et tous les médias)
+.gradle/
+.kotlin/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab

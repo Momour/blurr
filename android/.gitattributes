@@ -1,0 +1,9 @@
+# Fichiers binaires : aucune conversion de fin de ligne (core.autocrlf du poste Windows)
+*.onnx binary
+*.jar binary
+*.keystore binary
+*.apk binary
+
+# Scripts Gradle : fins de ligne imposées quel que soit le système
+gradlew text eol=lf
+*.bat text eol=crlf
