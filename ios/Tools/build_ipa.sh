@@ -29,6 +29,9 @@ lipo -info "$APP/Blurr"
 
 mkdir -p out/Payload
 cp -R "$APP" out/Payload/
+# Signature ad hoc (sans identité) : ajoute la signature de code attendue par les outils d'installation, qui la
+# remplacent par celle du compte de l'utilisateur.
+codesign --force --sign - --timestamp=none out/Payload/Blurr.app && codesign -dv out/Payload/Blurr.app 2>&1 | head -5 || true
 (cd out && zip -qry blurr-ios.ipa Payload)
 shasum -a 256 out/blurr-ios.ipa | tee out/blurr-ios.ipa.sha256
 ls -la out/blurr-ios.ipa

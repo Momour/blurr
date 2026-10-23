@@ -115,17 +115,19 @@ final class AppModel: ObservableObject {
         let options = self.options
         let verify = self.verify
 
-        task = Task.detached(priority: .userInitiated) { [weak self] in
+        // Le modèle vit autant que l'application : référence forte sans risque.
+        let model = self
+        task = Task.detached(priority: .userInitiated) {
             do {
                 let output = try await Pipeline.process(info: info, options: options, verify: verify, cancel: token) { stage, fraction, detail in
-                    Task { @MainActor [weak self] in self?.showProgress(stage, fraction, detail) }
+                    Task { @MainActor in model.showProgress(stage, fraction, detail) }
                 }
-                await MainActor.run { [weak self] in self?.finished(output) }
+                await model.finished(output)
             } catch is CancelledError {
-                await MainActor.run { [weak self] in self?.cancelled() }
+                await model.cancelled()
             } catch {
                 AppLog.e("Traitement échoué", error)
-                await MainActor.run { [weak self] in self?.failed(error) }
+                await model.failed(error)
             }
         }
     }

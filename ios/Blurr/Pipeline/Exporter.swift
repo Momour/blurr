@@ -224,14 +224,17 @@ final class Exporter: @unchecked Sendable {
             continuation = cont
             lock.unlock()
 
+            // Objets AVFoundation utilisés chacun depuis une seule file (vidéo ou audio).
+            let video = VideoChannel(input: videoIn, output: videoOut, adaptor: adaptor, renderer: renderer, writer: writer)
             let videoQueue = DispatchQueue(label: "blurr.export.video", qos: .userInitiated)
             videoIn.requestMediaDataWhenReady(on: videoQueue) { [self] in
-                self.feedVideo(input: videoIn, output: videoOut, adaptor: adaptor, renderer: renderer, writer: writer, reader: reader)
+                self.feedVideo(video)
             }
             if let audioIn, let audioOut {
+                let audio = AudioChannel(input: audioIn, output: audioOut, writer: writer)
                 let audioQueue = DispatchQueue(label: "blurr.export.audio", qos: .userInitiated)
                 audioIn.requestMediaDataWhenReady(on: audioQueue) { [self] in
-                    self.feedAudio(input: audioIn, output: audioOut, writer: writer, reader: reader)
+                    self.feedAudio(audio)
                 }
             }
         }
@@ -263,10 +266,26 @@ final class Exporter: @unchecked Sendable {
 
     // ------------------------------------------------------------------------------------------ files d'écriture
 
-    private func feedVideo(
-        input: AVAssetWriterInput, output: AVAssetReaderTrackOutput, adaptor: AVAssetWriterInputPixelBufferAdaptor,
-        renderer: BLRMaskRenderer, writer: AVAssetWriter, reader: AVAssetReader
-    ) {
+    private struct VideoChannel: @unchecked Sendable {
+        let input: AVAssetWriterInput
+        let output: AVAssetReaderTrackOutput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let renderer: BLRMaskRenderer
+        let writer: AVAssetWriter
+    }
+
+    private struct AudioChannel: @unchecked Sendable {
+        let input: AVAssetWriterInput
+        let output: AVAssetReaderTrackOutput
+        let writer: AVAssetWriter
+    }
+
+    private func feedVideo(_ channel: VideoChannel) {
+        let input = channel.input
+        let output = channel.output
+        let adaptor = channel.adaptor
+        let renderer = channel.renderer
+        let writer = channel.writer
         while input.isReadyForMoreMediaData {
             if isFinished() { return }
             if cancel.isCancelled {
@@ -309,7 +328,10 @@ final class Exporter: @unchecked Sendable {
         }
     }
 
-    private func feedAudio(input: AVAssetWriterInput, output: AVAssetReaderTrackOutput, writer: AVAssetWriter, reader: AVAssetReader) {
+    private func feedAudio(_ channel: AudioChannel) {
+        let input = channel.input
+        let output = channel.output
+        let writer = channel.writer
         while input.isReadyForMoreMediaData {
             if isFinished() || cancel.isCancelled { return }
             let keepGoing: Bool = autoreleasepool {

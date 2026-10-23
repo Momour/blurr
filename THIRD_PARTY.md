@@ -18,3 +18,19 @@ Ce document répertorie les bibliothèques logicielles tierces, leurs licences e
 - Les licences Java sont celles déclarées dans les fichiers POM des 60 artefacts résolus par Gradle pour l'exécution (`./gradlew :app:dependencies --configuration debugRuntimeClasspath`) : 59 sous Apache-2.0, 1 sous MIT (`org.checkerframework:checker-qual` 3.43.0). Il s'agit d'un relevé technique, pas d'une revue juridique.
 - Les noms et versions des composants natifs d'OpenCV proviennent du rapport de configuration inclus dans `libopencv_java4.so`. L'inventaire de leurs licences reste à faire.
 - L'APK n'embarque pas encore les textes de licence ni l'avis de copyright du modèle YuNet (MIT). À ajouter (écran « Licences » ou fichiers dans l'APK) avant toute diffusion publique.
+
+## Application iOS
+
+| Dépendance | Licence | Utilisation |
+|---|---|---|
+| OpenCV 4.14.0, cadre iOS publié par le projet OpenCV (`opencv-4.14.0-ios-framework.zip`, SHA-256 `f4f428fa9270adf95b3ed4705eb18ba3028ed2c2777a4f1a002739b869986a6a`) | Apache-2.0 | iOS : exécution de YuNet (`FaceDetectorYN`), réduction des images, rendu du flou. Bibliothèque statique liée à l'application ; seuls les modules utilisés sont retenus à l'édition de liens |
+| Composants internes du cadre OpenCV pour iOS (zlib, Protobuf, libjpeg-turbo, libpng, etc.) | **À inventorier** | iOS : comme pour Android, aucun texte de licence n'est fourni avec le cadre |
+| Modèle YuNet `face_detection_yunet_2023mar.onnx` (OpenCV Zoo, © 2020 Shiqi Yu) | MIT | iOS : même fichier que l'application Android (`android/app/src/main/assets/models/`), copié dans l'application |
+| Cadres d'Apple (AVFoundation, CoreMedia, CoreVideo, SwiftUI, Photos, etc.) | Bibliothèques système | iOS : décodage, encodage, interface |
+| XcodeGen | MIT | Compilation uniquement (génération du projet Xcode). Non inclus dans l'application |
+| Image `samples/data/messi5.jpg` du dépôt OpenCV | Celle du dépôt OpenCV | Tests sur simulateur uniquement : téléchargée par la compilation, ni versionnée ni distribuée |
+
+## Notes (application iOS)
+
+- L'application comporte un écran « Licences » : textes de la GPL-3.0 (blurr), de la licence MIT de YuNet et de la licence Apache 2.0 d'OpenCV.
+- Le manifeste de confidentialité (`ios/Blurr/Resources/PrivacyInfo.xcprivacy`) déclare l'absence de suivi et de données collectées, et les raisons d'usage des API concernées (réglages, espace disque, horodatage de fichiers, mesure de durées).

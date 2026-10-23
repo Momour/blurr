@@ -16,7 +16,12 @@ blurr/
   desktop/            # Environnement Python desktop (CLI blurr-ref, ingestion, métriques, baselines)
   dataset/            # Métadonnées, matrice de conditions, guide d'annotation (aucun média)
   android/            # Application Android v0.2 (YuNet via OpenCV, suivi temporel, flou ou masque noir via Media3), APK dans android/apk/
+  ios/                # Application iOS v0.2 (même moteur : Swift, rendu C++ avec OpenCV, AVFoundation), IPA dans la pré-version ios-latest
 ```
+
+## Application iOS
+
+Fichier `blurr-ios.ipa` de la pré-version [ios-latest](https://github.com/Momour/blurr/releases/tag/ios-latest), compilé par GitHub Actions, à installer sur iPhone (iOS 17 ou plus) avec Sideloadly et un compte Apple, même gratuit. Installation, utilisation et état de vérification : [ios/README.md](ios/README.md).
 
 ## Licence
 

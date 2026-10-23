@@ -64,16 +64,24 @@ final class PipelineTests: XCTestCase {
         XCTAssertTrue(produced.hasAudio)
         XCTAssertEqual(Double(produced.durationUs) / 1e6, 2.0, accuracy: 0.1)
 
-        // Zone du visage : texture effacée. Bas de l'image, loin du visage : conservé (à la compression près).
+        // Centre du visage (à l'intérieur de l'ellipse) : texture effacée. Bas de l'image, loin du visage : conservé
+        // (à la compression près).
         let srcFrame = try await SyntheticVideo.frame(of: info.url, at: 1.0)
         let outFrame = try await SyntheticVideo.frame(of: out.url, at: 1.0)
-        let faceCore = SyntheticVideo.faceRect(spec, frame: 30).insetBy(dx: 60, dy: 60)
+        let faceCore = SyntheticVideo.faceRect(spec, frame: 30).insetBy(dx: 80, dy: 80)
         let before = SyntheticVideo.stats(srcFrame, faceCore)
         let after = SyntheticVideo.stats(outFrame, faceCore)
-        XCTAssertLessThan(after.std, before.std * 0.6, "écart type avant \(before.std), après \(after.std)")
+        XCTAssertLessThan(after.std, before.std * 0.5, "écart type avant \(before.std), après \(after.std)")
         let background = CGRect(x: 0, y: 310, width: 640, height: 50)
         XCTAssertEqual(SyntheticVideo.stats(srcFrame, background).mean, SyntheticVideo.stats(outFrame, background).mean, accuracy: 8)
         try await assertNoLocation(out.url)
+
+        // Même source, masque noir : le centre du visage est noir.
+        let black = try await process(info, options: Options(style: .black), verify: false)
+        let blackFrame = try await SyntheticVideo.frame(of: black.url, at: 1.0)
+        let dark = SyntheticVideo.stats(blackFrame, faceCore)
+        XCTAssertLessThan(dark.mean, 20, "luminance moyenne \(dark.mean)")
+        XCTAssertGreaterThanOrEqual(black.report.plan.confirmedTracks, 1)
     }
 
     func testVideoPortraitTransformationConservee() async throws {
@@ -95,8 +103,10 @@ final class PipelineTests: XCTestCase {
             // Le flou est au bon endroit dans l'image affichée (masques convertis dans le repère codé).
             let srcFrame = try await SyntheticVideo.frame(of: info.url, at: 0.5)
             let outFrame = try await SyntheticVideo.frame(of: out.url, at: 0.5)
-            let faceCore = SyntheticVideo.faceRect(spec, frame: 15).insetBy(dx: 60, dy: 60)
-            XCTAssertLessThan(SyntheticVideo.stats(outFrame, faceCore).std, SyntheticVideo.stats(srcFrame, faceCore).std * 0.6)
+            let faceCore = SyntheticVideo.faceRect(spec, frame: 15).insetBy(dx: 80, dy: 80)
+            let before = SyntheticVideo.stats(srcFrame, faceCore)
+            let after = SyntheticVideo.stats(outFrame, faceCore)
+            XCTAssertLessThan(after.std, before.std * 0.5, "écart type avant \(before.std), après \(after.std)")
         }
     }
 

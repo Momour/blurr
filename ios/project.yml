@@ -58,6 +58,8 @@ targets:
       path: Blurr/Info.plist
       properties:
         CFBundleDisplayName: blurr
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         CFBundleDevelopmentRegion: fr
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
