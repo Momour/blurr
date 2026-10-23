@@ -30,6 +30,9 @@ xcodebuild test \
   -scheme Blurr \
   -destination "id=$UDID" \
   -resultBundlePath out/tests.xcresult \
+  -test-timeouts-enabled YES \
+  -default-test-execution-time-allowance 600 \
+  -maximum-test-execution-time-allowance 900 \
   CODE_SIGNING_ALLOWED=NO \
   2>&1 | tee out/xcodebuild-test.log \
   | (grep -E "Test Case .*(passed|failed|skipped)|error:|Executed|TEST (SUCCEEDED|FAILED)|\*\* " || true)
