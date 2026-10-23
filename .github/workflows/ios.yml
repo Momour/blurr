@@ -100,7 +100,7 @@ jobs:
           cat > release-notes.md <<EOF
           Application iOS de blurr (floutage des visages hors ligne), compilation n° ${{ github.run_number }}, commit ${GITHUB_SHA:0:7}.
 
-          Fichier non signé : à installer sur iPhone (iOS 17 ou plus) avec Sideloadly ou AltStore et un compte Apple, même gratuit. Guide : https://github.com/${{ github.repository }}/blob/ios/ios/README.md
+          Fichier sans certificat Apple (signature ad hoc) : à installer sur iPhone (iOS 17 ou plus) avec Sideloadly ou AltStore et un compte Apple, même gratuit, qui le signe à l'installation. Guide : https://github.com/${{ github.repository }}/blob/ios/ios/README.md
 
           SHA-256 de blurr-ios.ipa : \`${SUM}\`
 
