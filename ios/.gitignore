@@ -1,0 +1,12 @@
+# Produits de compilation de l'application iOS (régénérés par la compilation GitHub Actions)
+Frameworks/
+out/
+Blurr.xcodeproj/
+Blurr/Info.plist
+BlurrCore/.build/
+BlurrCore/.swiftpm/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcresult
+*.ipa

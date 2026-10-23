@@ -1,0 +1,114 @@
+# Compilation de l'application iOS sur un Mac de GitHub (gratuit pour un dépôt public) : tests du moteur, tests sur
+# simulateur iPhone, archive non signée publiée en pré-version « ios-latest » (fichier blurr-ios.ipa, à installer avec
+# Sideloadly ou AltStore : voir ios/README.md).
+name: iOS
+
+on:
+  push:
+    branches: [ios]
+    paths:
+      - "ios/**"
+      - "!ios/**/*.md"
+      - ".github/workflows/ios.yml"
+      - "android/app/src/main/assets/models/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compilation, tests et IPA
+    # Mac Intel : le cadre OpenCV publié ne contient que les architectures arm64 (iPhone) et x86_64 (simulateur).
+    runs-on: macos-26-intel
+    timeout-minutes: 75
+    env:
+      OPENCV_VERSION: "4.14.0"
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Versions des outils
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          ls -d /Applications/Xcode*.app
+
+      - name: Cache OpenCV
+        id: opencv-cache
+        uses: actions/cache@v4
+        with:
+          path: ios/Frameworks/opencv2.framework
+          key: opencv-ios-${{ env.OPENCV_VERSION }}-${{ hashFiles('ios/Tools/fetch_opencv.sh') }}
+
+      - name: OpenCV pour iOS
+        if: steps.opencv-cache.outputs.cache-hit != 'true'
+        run: bash ios/Tools/fetch_opencv.sh "$OPENCV_VERSION" ios/Frameworks
+
+      - name: Tests du moteur (BlurrCore)
+        run: swift test --package-path ios/BlurrCore 2>&1 | tail -n 40
+
+      - name: XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Icône et image de test
+        run: |
+          swift ios/Tools/make_icon.swift ios/Blurr/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+          curl -sSfL --retry 3 -o ios/BlurrTests/Fixtures/face.jpg \
+            https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/messi5.jpg || echo "Image de test indisponible : tests du visage ignorés"
+
+      - name: Projet Xcode
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Tests sur simulateur iPhone
+        id: tests
+        run: bash ios/Tools/run_simulator_tests.sh
+
+      - name: Archive non signée (iPhone)
+        id: ipa
+        if: always() && steps.tests.conclusion != 'skipped'
+        run: bash ios/Tools/build_ipa.sh "${{ github.run_number }}"
+
+      - name: Journaux et IPA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blurr-ios-${{ github.run_number }}
+          path: |
+            ios/out/blurr-ios.ipa
+            ios/out/blurr-ios.ipa.sha256
+            ios/out/*.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Pré-version ios-latest
+        if: success() && github.ref == 'refs/heads/ios'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SUM="$(cut -d' ' -f1 ios/out/blurr-ios.ipa.sha256)"
+          cat > release-notes.md <<EOF
+          Application iOS de blurr (floutage des visages hors ligne), compilation n° ${{ github.run_number }}, commit ${GITHUB_SHA:0:7}.
+
+          Fichier non signé : à installer sur iPhone (iOS 17 ou plus) avec Sideloadly ou AltStore et un compte Apple, même gratuit. Guide : https://github.com/${{ github.repository }}/blob/ios/ios/README.md
+
+          SHA-256 de blurr-ios.ipa : \`${SUM}\`
+
+          Tests automatiques passés sur simulateur ; regarder la vidéo produite en entier avant toute diffusion.
+          EOF
+          gh release delete ios-latest --yes --cleanup-tag || true
+          gh release create ios-latest ios/out/blurr-ios.ipa \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "blurr iOS (dernière compilation)" \
+            --notes-file release-notes.md

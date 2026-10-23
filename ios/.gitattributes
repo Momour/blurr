@@ -1,0 +1,4 @@
+# Fins de ligne LF pour tout le code iOS (scripts exécutés sur macOS).
+* text=auto eol=lf
+*.json text eol=lf
+*.onnx binary
